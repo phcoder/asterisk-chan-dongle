@@ -447,34 +447,39 @@ static int pdu_parse_number(char ** pdu, size_t * pdu_length, unsigned digits, i
 
 	begin = *pdu;
 	*toa = pdu_parse_byte(pdu, pdu_length);
-	if(*toa >= 0)
+	if(*toa < 0)
+		return -EINVAL;
+	unsigned syms = ROUND_UP2(digits);
+	if(syms > *pdu_length)
+		return -EINVAL;
+	if((*toa & 0xe0) == 0xc0)
+	  {
+		  memset (number, 0, num_len);
+		  str_recode(RECODE_DECODE, STR_ENCODING_7BIT_HEX, *pdu, syms, number, num_len);
+		  *pdu += syms;
+		  *pdu_length -= syms;
+		  return *pdu - begin;
+	  }
+
+	signed char digit;
+	if(*toa == NUMBER_TYPE_INTERNATIONAL)
+		*number++ = '+';
+	for(; syms > 0; syms -= 2, *pdu += 2, *pdu_length -= 2)
 	{
-		unsigned syms = ROUND_UP2(digits);
-		if(syms <= *pdu_length)
-		{
-			signed char digit;
-			if(*toa == NUMBER_TYPE_INTERNATIONAL)
-				*number++ = '+';
-			for(; syms > 0; syms -= 2, *pdu += 2, *pdu_length -= 2)
-			{
-				digit = pdu_code2digit(pdu[0][1]);
-				if(digit <= 0)
-					return -1;
-				*number++ = digit;
+		digit = pdu_code2digit(pdu[0][1]);
+		if(digit <= 0)
+			return -1;
+		*number++ = digit;
 
-				digit = pdu_code2digit(pdu[0][0]);
-				if(digit < 0 || (digit == 0 && (syms != 2 || (digits & 0x1) == 0)))
-					return -1;
+		digit = pdu_code2digit(pdu[0][0]);
+		if(digit < 0 || (digit == 0 && (syms != 2 || (digits & 0x1) == 0)))
+			return -1;
 
-				*number++ = digit;
-			}
-			if((digits & 0x1) == 0)
-				*number = 0;
-			return *pdu - begin;
-		}
+		*number++ = digit;
 	}
-
-	return -EINVAL;
+	if((digits & 0x1) == 0)
+		*number = 0;
+	return *pdu - begin;
 }
 
 
