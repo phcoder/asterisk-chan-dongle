@@ -703,6 +703,11 @@ EXPORT_DEF const char * pdu_parse(char ** pdu, size_t tpdu_length, char * oa, si
 							int dcs = pdu_parse_byte(pdu, &pdu_length);
 							if(dcs >= 0)
 							{
+								/* Special case in documentation.  */
+							    if ((dcs >> 4) == 0xf)
+							    {
+								    dcs &= 0x0f;
+							    }
 							    // TODO: support compression
 							    if( PDU_DCS_76(dcs) == PDU_DCS_76_00
 							    		&&
