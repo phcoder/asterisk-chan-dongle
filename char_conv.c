@@ -216,25 +216,47 @@ static ssize_t char_to_hexstr_7bitleft (const char* in, size_t in_length, char* 
 	return char_to_hexstr_7bitany(in, in_length, out, out_size, 1);
 }
 
+/* Table from GSM 7-bit to UTF-8.  */
+static const char table_7bit_to_utf8[0x80][3] = {
+  "@",        "\xc2\xa3", "$",        "\xc2\xa5", "\xc3\xa8", "\xc3\xa9", "\xc3\xb9", "\xc3\xac", 
+  "\xc3\xb2", "\xc3\x87", "\x0d",     "\xc3\x98", "\xc3\xb8", "\x0a",     "\xc3\x85", "\xc3\xa5", 
+  "\xce\x94", "_",        "\xce\xa6", "\xce\x93", "\xce\x9b", "\xce\xa9", "\xce\xa0", "\xce\xa8", 
+  "\xce\xa3", "\xce\x98", "\xce\x9e", " ",        "\xc3\x86", "\xc3\xa6", "\xc3\x9f", "\xc3\x89", 
+  " ",        "!",        "\"",       "#",        "\xc2\xa4", "%",        "&",        "'",        
+  "(",        ")",        "*",        "+",        ",",        "-",        ".",        "/",        
+  "0",        "1",        "2",        "3",        "4",        "5",        "6",        "7",        
+  "8",        "9",        ":",        ";",        "<",        "=",        ">",        "?",        
+  "\xc2\xa1", "A",        "B",        "C",        "D",        "E",        "F",        "G",        
+  "H",        "I",        "J",        "K",        "L",        "M",        "N",        "O",        
+  "P",        "Q",        "R",        "S",        "T",        "U",        "V",        "W",        
+  "X",        "Y",        "Z",        "\xc3\x84", "\xc3\x96", "\xc3\x91", "\xc3\x9c", "\xc2\xa7", 
+  "\xc2\xbf", "a",        "b",        "c",        "d",        "e",        "f",        "g",        
+  "h",        "i",        "j",        "k",        "l",        "m",        "n",        "o",        
+  "p",        "q",        "r",        "s",        "t",        "u",        "v",        "w",        
+  "x",        "y",        "z",        "\xc3\xa4", "\xc3\xb6", "\xc3\xb1", "\xc3\xbc", "\xc3\xa0", 
+};
+
 static ssize_t hexstr_7bitany_to_char (const char* in, size_t in_length, char* out, size_t out_size, int s0)
 {
 	size_t		i;
-	size_t		x;
+	char		*x;
 	size_t		s;
+	size_t          xlen;
 	int		hexval;
 	unsigned char	c;
 	unsigned char	b;
 	char	buf[] = { 0x0, 0x0, 0x0 };
 
 	in_length = in_length / 2;
-	x = in_length + in_length / 7;
-	if (out_size - 1 < x)
+	xlen = in_length + in_length / 7;
+	if (out_size - 1 < xlen)
 	{
 		return -1;
 	}
 
-	for (i = 0, x = 0, s = s0, b = 0; i < in_length; i++)
+	for (i = 0, x = out, s = s0, b = 0; i < in_length; i++)
 	{
+		const char *utf8c;
 		memcpy (buf, in + i * 2, 2);
 		if (sscanf (buf, "%x", &hexval) != 1)
 		{
@@ -245,20 +267,26 @@ static ssize_t hexstr_7bitany_to_char (const char* in, size_t in_length, char* o
 		c = (c >> 1) | b;
 		b = ((unsigned char) hexval) >> (8 - s);
 
-		out[x] = c;
-		x++; s++;
+		/* TODO: support escape sequences.  */
+		utf8c = table_7bit_to_utf8[c & 0x7f];
+		if (x + strlen(utf8c) >= out + out_size)
+			return -1;
+		x = stpcpy (x, utf8c);
+		s++;
 
 		if (s == 8)
-		{
-			out[x] = b;
-			s = 1; b = 0;
-			x++;
-		}
+		  {
+			  utf8c = table_7bit_to_utf8[b & 0x7f];
+			  if (x + strlen(utf8c) >= out + out_size)
+				  return -1;
+			  x = stpcpy (x, utf8c);
+			  s = 1; b = 0;
+		  }
 	}
 
-	out[x] = '\0';
+	*x = '\0';
 
-	return x;
+	return x - out;
 }
 
 static ssize_t hexstr_7bit_to_char (const char* in, size_t in_length, char* out, size_t out_size)
