@@ -11,13 +11,14 @@
 /* for simplefy first 3 values same as in PDU DCS bits 3..2 */
 /* NOTE: order is magic see definition of recoders in char_conv.c */
 typedef enum {
-	STR_ENCODING_7BIT_HEX		= 0,	/* 7bit encoding */
+	STR_ENCODING_7BIT_HEX		= 0,	/* 7bit encoding with most significant bit unused*/
 	STR_ENCODING_8BIT_HEX,			/* 8bit encoding */
 	STR_ENCODING_UCS2_HEX,			/* UCS-2 in hex like PDU */
 /* TODO: check its really 7bit input from device */
 	STR_ENCODING_7BIT,			/* 7bit ASCII  no need recode to utf-8 */
 //	STR_ENCODING_8BIT,			/* 8bit */
 //	STR_ENCODING_UCS2,			/* UCS2 */
+	STR_ENCODING_7BIT_HEX_LEFT_ALIGNED,	/* 7bit encoding with most significant bit used */
 	STR_ENCODING_UNKNOWN,			/* still unknown */
 } str_encoding_t;
 

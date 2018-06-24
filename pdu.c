@@ -769,6 +769,9 @@ EXPORT_DEF const char * pdu_parse(char ** pdu, size_t tpdu_length, char * oa, si
 		/* skip UDH */
 		*pdu += udhl * 2;
 		pdu_length -= udhl * 2;
+
+		if (*msg_enc == STR_ENCODING_7BIT_HEX)
+			*msg_enc = STR_ENCODING_7BIT_HEX_LEFT_ALIGNED;
 	}
 	/* save message */
 	*msg = *pdu;

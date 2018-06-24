@@ -159,7 +159,7 @@ static ssize_t utf8_to_hexstr_ucs2 (const char* in, size_t in_length, char* out,
 	return res;
 }
 
-static ssize_t char_to_hexstr_7bit (const char* in, size_t in_length, char* out, size_t out_size)
+static ssize_t char_to_hexstr_7bitany (const char* in, size_t in_length, char* out, size_t out_size, int s0)
 {
 	size_t		i;
 	size_t		x = 0;
@@ -177,7 +177,7 @@ static ssize_t char_to_hexstr_7bit (const char* in, size_t in_length, char* out,
 	if(in_length > 0)
 	{
 		in_length--;
-		for (i = 0, x = 0, s = 0; i < in_length; i++)
+		for (i = 0, x = 0, s = s0; i < in_length; i++)
 		{
 			if (s == 7)
 			{
@@ -206,7 +206,17 @@ static ssize_t char_to_hexstr_7bit (const char* in, size_t in_length, char* out,
 	return x;
 }
 
-static ssize_t hexstr_7bit_to_char (const char* in, size_t in_length, char* out, size_t out_size)
+static ssize_t char_to_hexstr_7bit (const char* in, size_t in_length, char* out, size_t out_size)
+{
+	return char_to_hexstr_7bitany(in, in_length, out, out_size, 0);
+}
+
+static ssize_t char_to_hexstr_7bitleft (const char* in, size_t in_length, char* out, size_t out_size)
+{
+	return char_to_hexstr_7bitany(in, in_length, out, out_size, 1);
+}
+
+static ssize_t hexstr_7bitany_to_char (const char* in, size_t in_length, char* out, size_t out_size, int s0)
 {
 	size_t		i;
 	size_t		x;
@@ -223,7 +233,7 @@ static ssize_t hexstr_7bit_to_char (const char* in, size_t in_length, char* out,
 		return -1;
 	}
 
-	for (i = 0, x = 0, s = 1, b = 0; i < in_length; i++)
+	for (i = 0, x = 0, s = s0, b = 0; i < in_length; i++)
 	{
 		memcpy (buf, in + i * 2, 2);
 		if (sscanf (buf, "%x", &hexval) != 1)
@@ -251,6 +261,17 @@ static ssize_t hexstr_7bit_to_char (const char* in, size_t in_length, char* out,
 	return x;
 }
 
+static ssize_t hexstr_7bit_to_char (const char* in, size_t in_length, char* out, size_t out_size)
+{
+	return hexstr_7bitany_to_char (in, in_length, out, out_size, 1);
+}
+
+static ssize_t hexstr_7bitleft_to_char (const char* in, size_t in_length, char* out, size_t out_size)
+{
+	return hexstr_7bitany_to_char (in, in_length, out, out_size, 0);
+}
+
+
 #/* */
 ssize_t just_copy (const char* in, size_t in_length, char* out, size_t out_size)
 {
@@ -274,6 +295,7 @@ static const coder recoders[][2] =
 	{ hexstr_to_8bitchars, chars8bit_to_hexstr },		/* STR_ENCODING_8BIT_HEX */
 	{ hexstr_ucs2_to_utf8, utf8_to_hexstr_ucs2 },		/* STR_ENCODING_UCS2_HEX */
 	{ just_copy, just_copy },				/* STR_ENCODING_7BIT */
+	{ hexstr_7bitleft_to_char, char_to_hexstr_7bitleft },	/* STR_ENCODING_7BIT_HEX_LEFT_ALIGNED */
 };
 
 #/* */
