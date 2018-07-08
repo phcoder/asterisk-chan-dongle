@@ -1199,80 +1199,78 @@ static int at_response_cmgr (struct pvt* pvt, const char * str, size_t len)
 	const struct at_queue_cmd * ecmd = at_queue_head_cmd (pvt);
 
 	manager_event_message("DongleNewCMGR", PVT_ID(pvt), str);
-	if (ecmd)
+	if (!ecmd)
 	{
-	    if (ecmd->res == RES_CMGR || ecmd->cmd == CMD_USER)
+		ast_log (LOG_WARNING, "[%s] Received unexpected '+CMGR'\n", PVT_ID(pvt));
+		return 0;
+	}
+	
+	if (ecmd->res != RES_CMGR && ecmd->cmd != CMD_USER)
 	    {
-		at_queue_handle_result (pvt, RES_CMGR);
-		pvt->incoming_sms = 0;
-		pvt_try_restate(pvt);
+		ast_log (LOG_ERROR, "[%s] Received '+CMGR' when expecting '%s' response to '%s', ignoring\n", PVT_ID(pvt),
+				at_res2str (ecmd->res), at_cmd2str (ecmd->cmd));
+		return 0;
+	    }
+	
+	at_queue_handle_result (pvt, RES_CMGR);
+	pvt->incoming_sms = 0;
+	pvt_try_restate(pvt);
 
-		cmgr = err_pos = ast_strdupa (str);
-		err = at_parse_cmgr (&err_pos, len, oa, sizeof(oa), &oa_enc, &msg, &msg_enc);
-		if (err)
-		{
-			ast_log (LOG_WARNING, "[%s] Error parsing incoming message '%s' at possition %d: %s\n", PVT_ID(pvt), str, (int)(err_pos - cmgr), err);
-			return 0;
-		}
+	cmgr = err_pos = ast_strdupa (str);
+	err = at_parse_cmgr (&err_pos, len, oa, sizeof(oa), &oa_enc, &msg, &msg_enc);
+	if (err)
+	{
+		ast_log (LOG_WARNING, "[%s] Error parsing incoming message '%s' at possition %d: %s\n", PVT_ID(pvt), str, (int)(err_pos - cmgr), err);
+		return 0;
+	}
 
-		ast_debug (1, "[%s] Successfully read SMS message\n", PVT_ID(pvt));
+	ast_debug (1, "[%s] Successfully read SMS message\n", PVT_ID(pvt));
 
-		/* last chance to define encodings */
-		if (oa_enc == STR_ENCODING_UNKNOWN)
-			oa_enc = pvt->use_ucs2_encoding ? STR_ENCODING_UCS2_HEX : STR_ENCODING_7BIT;
+	/* last chance to define encodings */
+	if (oa_enc == STR_ENCODING_UNKNOWN)
+		oa_enc = pvt->use_ucs2_encoding ? STR_ENCODING_UCS2_HEX : STR_ENCODING_7BIT;
 
-		if (msg_enc == STR_ENCODING_UNKNOWN)
-			msg_enc = pvt->use_ucs2_encoding ? STR_ENCODING_UCS2_HEX : STR_ENCODING_7BIT;
+	if (msg_enc == STR_ENCODING_UNKNOWN)
+		msg_enc = pvt->use_ucs2_encoding ? STR_ENCODING_UCS2_HEX : STR_ENCODING_7BIT;
 
-		/* decode number and message */
-		res = str_recode (RECODE_DECODE, oa_enc, oa, strlen(oa), from_number_utf8_str, sizeof (from_number_utf8_str));
-		if (res < 0)
-		{
-			ast_log (LOG_ERROR, "[%s] Error decode SMS originator address: '%s', message is '%s'\n", PVT_ID(pvt), oa, str);
-			number = oa;
-			return 0;
-		}
-		else
-			number = from_number_utf8_str;
+	/* decode number and message */
+	res = str_recode (RECODE_DECODE, oa_enc, oa, strlen(oa), from_number_utf8_str, sizeof (from_number_utf8_str));
+	if (res < 0)
+	{
+		ast_log (LOG_ERROR, "[%s] Error decode SMS originator address: '%s', message is '%s'\n", PVT_ID(pvt), oa, str);
+		number = oa;
+		return 0;
+	}
+	else
+		number = from_number_utf8_str;
 
-		msg_len = strlen(msg);
-		res = str_recode (RECODE_DECODE, msg_enc, msg, msg_len, sms_utf8_str, sizeof (sms_utf8_str));
-		if (res < 0)
-		{
-			ast_log (LOG_ERROR, "[%s] Error decode SMS text '%s' from encoding %d, message is '%s'\n", PVT_ID(pvt), msg, msg_enc, str);
-			return 0;
-		}
-		else
-		{
-			msg = sms_utf8_str;
-			msg_len = res;
-		}
+	msg_len = strlen(msg);
+	res = str_recode (RECODE_DECODE, msg_enc, msg, msg_len, sms_utf8_str, sizeof (sms_utf8_str));
+	if (res < 0)
+	{
+		ast_log (LOG_ERROR, "[%s] Error decode SMS text '%s' from encoding %d, message is '%s'\n", PVT_ID(pvt), msg, msg_enc, str);
+		return 0;
+	}
+	else
+	{
+		msg = sms_utf8_str;
+		msg_len = res;
+	}
 
-		ast_verb (1, "[%s] Got SMS from %s: '%s'\n", PVT_ID(pvt), number, msg);
-		ast_base64encode (text_base64, (unsigned char*)msg, msg_len, sizeof(text_base64));
+	ast_verb (1, "[%s] Got SMS from %s: '%s'\n", PVT_ID(pvt), number, msg);
+	ast_base64encode (text_base64, (unsigned char*)msg, msg_len, sizeof(text_base64));
 
-		manager_event_new_sms(PVT_ID(pvt), number, msg);
-		manager_event_new_sms_base64(PVT_ID(pvt), number, text_base64);
-		{
-			channel_var_t vars[] =
+	manager_event_new_sms(PVT_ID(pvt), number, msg);
+	manager_event_new_sms_base64(PVT_ID(pvt), number, text_base64);
+	{
+		channel_var_t vars[] =
 			{
 				{ "SMS", msg } ,
 				{ "SMS_BASE64", text_base64 },
 				{ "CMGR", (char *)str },
 				{ NULL, NULL },
 			};
-			start_local_channel (pvt, "sms", number, vars);
-		}
-	    }
-	    else
-	    {
-		ast_log (LOG_ERROR, "[%s] Received '+CMGR' when expecting '%s' response to '%s', ignoring\n", PVT_ID(pvt),
-				at_res2str (ecmd->res), at_cmd2str (ecmd->cmd));
-	    }
-	}
-	else
-	{
-		ast_log (LOG_WARNING, "[%s] Received unexpected '+CMGR'\n", PVT_ID(pvt));
+		start_local_channel (pvt, "sms", number, vars);
 	}
 
 	return 0;
