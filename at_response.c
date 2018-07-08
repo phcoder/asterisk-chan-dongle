@@ -81,6 +81,8 @@ static const at_response_t at_responses_list[] = {
 	{ RES_CLCC,"+CLCC", DEF_STR("+CLCC:") },
 	{ RES_CCWA,"+CCWA", DEF_STR("+CCWA:") },
 
+	{ RES_CMT, "+CMT",DEF_STR("+CMT:") },
+
 	/* duplicated response undef other id */
 	{ RES_CNUM, "+CNUM",DEF_STR("ERROR+CNUM:") },
 	{ RES_ERROR,"ERROR",DEF_STR("COMMAND NOT SUPPORT\r") },
@@ -1166,13 +1168,13 @@ static int at_response_cmti (struct pvt* pvt, const char* str)
 	}
 	else
 	{
-		ast_log (LOG_ERROR, "[%s] Error parsing incoming sms message alert '%s', disconnecting\n", PVT_ID(pvt), str);
-		return -1;
+		ast_log (LOG_ERROR, "[%s] Error parsing incoming sms message alert '%s', not disconnecting\n", PVT_ID(pvt), str);
+		return 0;
 	}
 }
 
 /*!
- * \brief Handle +CMGR response
+ * \brief Handle +CMGR and +CMT response
  * \param pvt -- pvt structure
  * \param str -- string containing response (null terminated)
  * \param len -- string lenght
@@ -1180,7 +1182,8 @@ static int at_response_cmti (struct pvt* pvt, const char* str)
  * \retval -1 error
  */
 
-static int at_response_cmgr (struct pvt* pvt, const char * str, size_t len)
+static int at_response_cmgr (struct pvt* pvt, const char * str, size_t len,
+			     int is_cmt)
 {
 	char		oa[512] = "";
 	char*		msg = NULL;
@@ -1199,13 +1202,13 @@ static int at_response_cmgr (struct pvt* pvt, const char * str, size_t len)
 	const struct at_queue_cmd * ecmd = at_queue_head_cmd (pvt);
 
 	manager_event_message("DongleNewCMGR", PVT_ID(pvt), str);
-	if (!ecmd)
+	if (!ecmd && !is_cmt)
 	{
 		ast_log (LOG_WARNING, "[%s] Received unexpected '+CMGR'\n", PVT_ID(pvt));
 		return 0;
 	}
 	
-	if (ecmd->res != RES_CMGR && ecmd->cmd != CMD_USER)
+	if (!is_cmt && ecmd->res != RES_CMGR && ecmd->cmd != CMD_USER)
 	    {
 		ast_log (LOG_ERROR, "[%s] Received '+CMGR' when expecting '%s' response to '%s', ignoring\n", PVT_ID(pvt),
 				at_res2str (ecmd->res), at_cmd2str (ecmd->cmd));
@@ -1217,7 +1220,7 @@ static int at_response_cmgr (struct pvt* pvt, const char * str, size_t len)
 	pvt_try_restate(pvt);
 
 	cmgr = err_pos = ast_strdupa (str);
-	err = at_parse_cmgr (&err_pos, len, oa, sizeof(oa), &oa_enc, &msg, &msg_enc);
+	err = at_parse_cmgr (&err_pos, len, oa, sizeof(oa), &oa_enc, &msg, &msg_enc, is_cmt);
 	if (err)
 	{
 		ast_log (LOG_WARNING, "[%s] Error parsing incoming message '%s' at possition %d: %s\n", PVT_ID(pvt), str, (int)(err_pos - cmgr), err);
@@ -1787,8 +1790,11 @@ int at_response (struct pvt* pvt, const struct iovec iov[2], int iovcnt, at_res_
 			case RES_CMTI:
 				return at_response_cmti (pvt, str);
 
+		        case RES_CMT:
+				return at_response_cmgr (pvt, str, len, 1);
+
 			case RES_CMGR:
-				return at_response_cmgr (pvt, str, len);
+				return at_response_cmgr (pvt, str, len, 0);
 
 			case RES_SMS_PROMPT:
 				return at_response_sms_prompt (pvt);

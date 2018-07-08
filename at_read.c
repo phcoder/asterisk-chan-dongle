@@ -181,6 +181,16 @@ EXPORT_DEF int at_read_result_iov (const char * dev, int * read_result, struct r
 
 				return iovcnt;
 			}
+			else if (rb_memcmp (rb, "+CMT:", 5) == 0)
+			{
+				iovcnt = rb_read_until_mem_iov (rb, iov, "\n\r\n", 3);
+				if (iovcnt > 0)
+				{
+					*read_result = 0;
+				}
+
+				return iovcnt;
+			}
 			else
 			{
 				iovcnt = rb_read_until_mem_iov (rb, iov, "\r\n", 2);

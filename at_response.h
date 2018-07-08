@@ -55,7 +55,8 @@ typedef enum {
 	RES_CSCA,
 	RES_CLCC,
 	RES_CCWA,
-	RES_MAX = RES_CCWA,
+	RES_CMT,
+	RES_MAX = RES_CMT,
 } at_res_t;
 
 /*! response description */
