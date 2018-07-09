@@ -1230,10 +1230,10 @@ static int at_response_cmgr (struct pvt* pvt, const char * str, size_t len,
 	ast_debug (1, "[%s] Successfully read SMS message\n", PVT_ID(pvt));
 
 	/* last chance to define encodings */
-	if (oa_enc == STR_ENCODING_UNKNOWN)
+	if ((oa_enc & STR_ENCODING_TYPE_MASK) == STR_ENCODING_UNKNOWN)
 		oa_enc = pvt->use_ucs2_encoding ? STR_ENCODING_UCS2_HEX : STR_ENCODING_7BIT;
 
-	if (msg_enc == STR_ENCODING_UNKNOWN)
+	if ((msg_enc & STR_ENCODING_TYPE_MASK) == STR_ENCODING_UNKNOWN)
 		msg_enc = pvt->use_ucs2_encoding ? STR_ENCODING_UCS2_HEX : STR_ENCODING_7BIT;
 
 	/* decode number and message */

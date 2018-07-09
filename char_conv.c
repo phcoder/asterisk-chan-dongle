@@ -63,7 +63,7 @@ EXPORT_DEF int parse_hexdigit(int hex)
 	return -1;
 }
 
-static ssize_t hexstr_to_8bitchars (const char* in, size_t in_length, char* out, size_t out_size)
+static ssize_t hexstr_to_8bitchars (const char* in, size_t in_length, char* out, size_t out_size, str_encoding_t encoding)
 {
 	int d1, d2;
 
@@ -95,7 +95,7 @@ static ssize_t hexstr_to_8bitchars (const char* in, size_t in_length, char* out,
 	return out_size;
 }
 
-static ssize_t chars8bit_to_hexstr (const char* in, size_t in_length, char* out, size_t out_size)
+static ssize_t chars8bit_to_hexstr (const char* in, size_t in_length, char* out, size_t out_size, str_encoding_t encoding)
 {
 	static const char hex_table[] = "0123456789ABCDEF";
 	const unsigned char *in2 = (const unsigned char *)in;	/* for save time of first & 0x0F */
@@ -117,7 +117,7 @@ static ssize_t chars8bit_to_hexstr (const char* in, size_t in_length, char* out,
 	return out_size;
 }
 
-static ssize_t hexstr_ucs2_to_utf8 (const char* in, size_t in_length, char* out, size_t out_size)
+static ssize_t hexstr_ucs2_to_utf8 (const char* in, size_t in_length, char* out, size_t out_size, str_encoding_t encoding)
 {
 	char	buf[out_size];
 	ssize_t	res;
@@ -127,7 +127,7 @@ static ssize_t hexstr_ucs2_to_utf8 (const char* in, size_t in_length, char* out,
 		return -1;
 	}
 
-	res = hexstr_to_8bitchars (in, in_length, buf, out_size);
+	res = hexstr_to_8bitchars (in, in_length, buf, out_size, encoding);
 	if (res < 0)
 	{
 		return res;
@@ -138,7 +138,7 @@ static ssize_t hexstr_ucs2_to_utf8 (const char* in, size_t in_length, char* out,
 	return res;
 }
 
-static ssize_t utf8_to_hexstr_ucs2 (const char* in, size_t in_length, char* out, size_t out_size)
+static ssize_t utf8_to_hexstr_ucs2 (const char* in, size_t in_length, char* out, size_t out_size, str_encoding_t encoding)
 {
 	char	buf[out_size];
 	ssize_t	res;
@@ -154,12 +154,12 @@ static ssize_t utf8_to_hexstr_ucs2 (const char* in, size_t in_length, char* out,
 		return res;
 	}
 
-	res = chars8bit_to_hexstr (buf, res, out, out_size);
+	res = chars8bit_to_hexstr (buf, res, out, out_size, encoding);
 
 	return res;
 }
 
-static ssize_t char_to_hexstr_7bitany (const char* in, size_t in_length, char* out, size_t out_size, int s0)
+static ssize_t char_to_hexstr_7bit (const char* in, size_t in_length, char* out, size_t out_size, str_encoding_t encoding)
 {
 	size_t		i;
 	size_t		x = 0;
@@ -167,12 +167,15 @@ static ssize_t char_to_hexstr_7bitany (const char* in, size_t in_length, char* o
 	unsigned char	c;
 	unsigned char	b;
 	char	buf[] = { 0x0, 0x0, 0x0 };
+	int s0;
 
 	x = (in_length - in_length / 8) * 2;
 	if (out_size - 1 < x)
 	{
 		return -1;
 	}
+
+	s0 = (0 + ((encoding & STR_ENCODING_7BIT_OFFSET_MASK) >> STR_ENCODING_7BIT_OFFSET_SHIFT)) & 7;
 
 	if(in_length > 0)
 	{
@@ -206,16 +209,6 @@ static ssize_t char_to_hexstr_7bitany (const char* in, size_t in_length, char* o
 	return x;
 }
 
-static ssize_t char_to_hexstr_7bit (const char* in, size_t in_length, char* out, size_t out_size)
-{
-	return char_to_hexstr_7bitany(in, in_length, out, out_size, 0);
-}
-
-static ssize_t char_to_hexstr_7bitleft (const char* in, size_t in_length, char* out, size_t out_size)
-{
-	return char_to_hexstr_7bitany(in, in_length, out, out_size, 1);
-}
-
 /* Table from GSM 7-bit to UTF-8.  */
 static const char table_7bit_to_utf8[0x80][3] = {
   "@",        "\xc2\xa3", "$",        "\xc2\xa5", "\xc3\xa8", "\xc3\xa9", "\xc3\xb9", "\xc3\xac", 
@@ -236,7 +229,7 @@ static const char table_7bit_to_utf8[0x80][3] = {
   "x",        "y",        "z",        "\xc3\xa4", "\xc3\xb6", "\xc3\xb1", "\xc3\xbc", "\xc3\xa0", 
 };
 
-static ssize_t hexstr_7bitany_to_char (const char* in, size_t in_length, char* out, size_t out_size, int s0)
+static ssize_t hexstr_7bit_to_char (const char* in, size_t in_length, char* out, size_t out_size, str_encoding_t encoding)
 {
 	size_t		i;
 	char		*x;
@@ -246,6 +239,7 @@ static ssize_t hexstr_7bitany_to_char (const char* in, size_t in_length, char* o
 	unsigned char	c;
 	unsigned char	b;
 	char	buf[] = { 0x0, 0x0, 0x0 };
+	int s0;
 
 	in_length = in_length / 2;
 	xlen = in_length + in_length / 7;
@@ -253,6 +247,8 @@ static ssize_t hexstr_7bitany_to_char (const char* in, size_t in_length, char* o
 	{
 		return -1;
 	}
+
+	s0 = (1 + ((encoding & STR_ENCODING_7BIT_OFFSET_MASK) >> STR_ENCODING_7BIT_OFFSET_SHIFT)) & 7;
 
 	for (i = 0, x = out, s = s0, b = 0; i < in_length; i++)
 	{
@@ -289,19 +285,9 @@ static ssize_t hexstr_7bitany_to_char (const char* in, size_t in_length, char* o
 	return x - out;
 }
 
-static ssize_t hexstr_7bit_to_char (const char* in, size_t in_length, char* out, size_t out_size)
-{
-	return hexstr_7bitany_to_char (in, in_length, out, out_size, 1);
-}
-
-static ssize_t hexstr_7bitleft_to_char (const char* in, size_t in_length, char* out, size_t out_size)
-{
-	return hexstr_7bitany_to_char (in, in_length, out, out_size, 0);
-}
-
 
 #/* */
-ssize_t just_copy (const char* in, size_t in_length, char* out, size_t out_size)
+ssize_t just_copy (const char* in, size_t in_length, char* out, size_t out_size, str_encoding_t encoding)
 {
 	// FIXME: or copy out_size-1 bytes only ?
 	if (in_length <= out_size - 1)
@@ -313,7 +299,7 @@ ssize_t just_copy (const char* in, size_t in_length, char* out, size_t out_size)
 	return -ENOMEM;
 }
 
-typedef ssize_t (*coder) (const char* in, size_t in_length, char* out, size_t out_size);
+typedef ssize_t (*coder) (const char* in, size_t in_length, char* out, size_t out_size, str_encoding_t encoding);
 
 /* array in order of values RECODE_*  */
 static const coder recoders[][2] =
@@ -323,15 +309,14 @@ static const coder recoders[][2] =
 	{ hexstr_to_8bitchars, chars8bit_to_hexstr },		/* STR_ENCODING_8BIT_HEX */
 	{ hexstr_ucs2_to_utf8, utf8_to_hexstr_ucs2 },		/* STR_ENCODING_UCS2_HEX */
 	{ just_copy, just_copy },				/* STR_ENCODING_7BIT */
-	{ hexstr_7bitleft_to_char, char_to_hexstr_7bitleft },	/* STR_ENCODING_7BIT_HEX_LEFT_ALIGNED */
 };
 
 #/* */
 EXPORT_DEF ssize_t str_recode(recode_direction_t dir, str_encoding_t encoding, const char* in, size_t in_length, char* out, size_t out_size)
 {
-	unsigned idx = encoding;
+	unsigned idx = encoding & STR_ENCODING_TYPE_MASK;
 	if((dir == RECODE_DECODE || dir == RECODE_ENCODE) && idx < ITEMS_OF(recoders))
-		return (recoders[idx][dir])(in, in_length, out, out_size);
+		return (recoders[idx][dir])(in, in_length, out, out_size, encoding);
 	return -EINVAL;
 }
 

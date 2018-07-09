@@ -520,7 +520,7 @@ static int pdu_parse_timestamp(char ** pdu, size_t * length)
 static int check_encoding(const char* msg, unsigned length)
 {
 	str_encoding_t possible_enc = get_encoding(RECODE_ENCODE, msg, length);
-	if(possible_enc == STR_ENCODING_7BIT_HEX)
+	if((possible_enc & STR_ENCODING_TYPE_MASK) == STR_ENCODING_7BIT_HEX)
 		return PDU_DCS_ALPABET_7BIT;
 	return PDU_DCS_ALPABET_UCS2;
 }
@@ -770,8 +770,13 @@ EXPORT_DEF const char * pdu_parse(char ** pdu, size_t tpdu_length, char * oa, si
 		*pdu += udhl * 2;
 		pdu_length -= udhl * 2;
 
-		if (*msg_enc == STR_ENCODING_7BIT_HEX)
-			*msg_enc = STR_ENCODING_7BIT_HEX_LEFT_ALIGNED;
+		if ((*msg_enc & STR_ENCODING_7BIT_OFFSET_SHIFT) == STR_ENCODING_7BIT_HEX)
+		{
+			int shift = (*msg_enc & STR_ENCODING_7BIT_OFFSET_MASK) >> STR_ENCODING_7BIT_OFFSET_SHIFT;
+			shift += 2 + udhl;
+			shift &= 7;
+			*msg_enc = STR_ENCODING_7BIT_HEX | (shift << STR_ENCODING_7BIT_OFFSET_SHIFT);
+		}
 	}
 	/* save message */
 	*msg = *pdu;
