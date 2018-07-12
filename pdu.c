@@ -662,6 +662,50 @@ static str_encoding_t pdu_dcs_alpabet2encoding(int alpabet)
 	return rv;
 }
 
+static const char * pdu_parse_status_report(char ** pdu, size_t *pdu_length, char * oa, size_t oa_len, str_encoding_t * oa_enc, char ** msg, str_encoding_t * msg_enc)
+{
+	int message_reference = pdu_parse_byte(pdu, pdu_length);
+	int field_len;
+
+	if(message_reference < 0)
+		return "Can't parse message reference";
+	int oa_digits = pdu_parse_byte(pdu, pdu_length);
+	if(oa_digits <= 0)
+		return "Can't parse length of OA";
+
+	int oa_toa;
+	*oa_enc = STR_ENCODING_7BIT;
+	field_len = pdu_parse_number(pdu, pdu_length, oa_digits, &oa_toa, oa, oa_len);
+	if(field_len <= 0)
+		return "Can't parse OA";
+	int ts = pdu_parse_timestamp(pdu, pdu_length);
+	if(ts < 0)
+		return "Can't parse Timestamp";
+	int ts_dt = pdu_parse_timestamp(pdu, pdu_length);
+	if(ts_dt < 0)
+		return "Can't parse Timestamp";
+	int message_status = pdu_parse_byte(pdu, pdu_length);
+	if(message_status < 0 || message_status >= 256)
+		return "Can't parse message status";
+
+	*msg_enc = STR_ENCODING_7BIT;
+	if (message_status == 0)
+		*msg = "Delivered";
+	else
+	{
+		static const char *statusdesc[256];
+		if (statusdesc[message_status] == 0)
+		{
+			char msgsts[30];
+			sprintf(msgsts, "Unknown status %02x", message_status);
+			statusdesc[message_status] = strdup(msgsts);
+		}
+		*msg = statusdesc[message_status];
+	}
+
+	return NULL;
+}
+
 /*!
  * \brief Parse PDU
  * \param pdu -- SCA + TPDU
@@ -684,6 +728,13 @@ EXPORT_DEF const char * pdu_parse(char ** pdu, size_t tpdu_length, char * oa, si
 	int pdu_type = pdu_parse_byte(pdu, &pdu_length);
 	if(pdu_type < 0)
 		return "Can't parse PDU Type";
+
+	if(PDUTYPE_MTI(pdu_type) == PDUTYPE_MTI_SMS_STATUS_REPORT)
+	{
+		return pdu_parse_status_report(pdu, &pdu_length,
+					       oa, oa_len, oa_enc,
+					       msg, msg_enc);
+	}
 
 	/* TODO: also handle PDUTYPE_MTI_SMS_SUBMIT_REPORT and PDUTYPE_MTI_SMS_STATUS_REPORT */
 	if(PDUTYPE_MTI(pdu_type) != PDUTYPE_MTI_SMS_DELIVER)
