@@ -770,7 +770,7 @@ EXPORT_DEF const char * pdu_parse(char ** pdu, size_t tpdu_length, char * oa, si
 		*pdu += udhl * 2;
 		pdu_length -= udhl * 2;
 
-		if ((*msg_enc & STR_ENCODING_7BIT_OFFSET_SHIFT) == STR_ENCODING_7BIT_HEX)
+		if ((*msg_enc & STR_ENCODING_TYPE_MASK) == STR_ENCODING_7BIT_HEX)
 		{
 			int shift = (*msg_enc & STR_ENCODING_7BIT_OFFSET_MASK) >> STR_ENCODING_7BIT_OFFSET_SHIFT;
 			shift += 2 + udhl;
