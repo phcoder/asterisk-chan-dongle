@@ -7,6 +7,8 @@
    Dmitry Vagin <dmitry2004@yandex.ru>
 
    bg <bg_one@mail.ru>
+
+   Copyright (C) 2018 Google
 */
 #ifdef HAVE_CONFIG_H
 #include <config.h>

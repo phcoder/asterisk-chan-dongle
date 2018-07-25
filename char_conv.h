@@ -1,5 +1,6 @@
 /*
    Copyright (C) 2010 bg <bg_one@mail.ru>
+   Copyright (C) 2018 Google
 */
 #ifndef CHAN_DONGLE_CHAR_CONV_H_INCLUDED
 #define CHAN_DONGLE_CHAR_CONV_H_INCLUDED
